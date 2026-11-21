@@ -89,6 +89,7 @@ function syncAndroidOffers(){
  try{
   if(!window.AndroidBridge)return;
   const settings=JSON.parse(window.AndroidBridge.getProfitSettings()||"{}");
+  if(window.AndroidBridge.getAreaPreferences){const areaPrefs=JSON.parse(window.AndroidBridge.getAreaPreferences()||"{}");if(!data.preferredAreas)data.preferredAreas=(areaPrefs.preferred||[]).join("\n");if(!data.restrictedAreas)data.restrictedAreas=(areaPrefs.restricted||[]).join("\n");}
   if(Number.isFinite(Number(settings.costKm)))data.costKm=Number(settings.costKm);
   if(Number.isFinite(Number(settings.targetHour))&&Number(settings.targetHour)>0)data.targetHour=Number(settings.targetHour)===100?280:Number(settings.targetHour);
   const rows=JSON.parse(window.AndroidBridge.getDetectedOffers()||"[]");
