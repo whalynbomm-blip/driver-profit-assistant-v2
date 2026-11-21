@@ -1,17 +1,37 @@
-# IndAssistant V2 — Android companion
+# IndAssistant V2
 
-This repository contains the Android companion for the IndAssistant.
+IndAssistant has two parts in this repository:
 
-## Current scope
-- Android accessibility-service scaffold for reading visible inDrive offer text when the user enables it.
-- Optional floating overlay to display the text detected from an offer.
-- User-controlled reader ON/OFF switch.
-- The app does not tap Accept, Reject, or otherwise make trip decisions.
+1. **Web app (PWA):** driver offer calculator, estimated profit dashboard, offer history, vehicle-cost settings, area notes, and CSV/JSON export.
+2. **Android companion:** optional accessibility-based offer text reader, on-device ML Kit OCR fallback, reader ON/OFF switch, floating recommendation overlay, and locally stored detected-offer history.
+
+## Web app
+
+Live site: https://whalynbomm-blip.github.io/driver-profit-assistant-v2/
+
+Open the site in Chrome on Android. Use Chrome's menu and choose **Install app** or **Add to Home screen** to keep it on the phone. Web records are stored locally in that browser on that device; they are not yet synced to the Android companion or a cloud account.
+
+## Android companion
+
+GitHub Actions builds a debug APK on pushes to `main`. Open **Actions**, choose the latest successful **Build Android APK** run, then download the `driver-profit-assistant-debug` artifact and extract `app-debug.apk`.
+
+After installing:
+- Open IndAssistant and enable **Offer reading** in Android Accessibility settings.
+- Allow the floating assistant overlay when prompted.
+- Use the reader ON/OFF control whenever you want to pause or resume detection.
+- Set your own running cost per kilometre and minimum hourly net target.
+
+The reader checks accessibility text first and uses Android screen capture plus on-device ML Kit OCR as a fallback on Android 11 or newer. The exact inDrive package name and parsing behaviour still need validation against the installed inDrive version and real offer screens.
 
 ## Important limitations
-This is an early companion build, not the complete IndAssistant. It does not yet provide OCR for image-only offer screens, robust inDrive screen parsing, full trip-profit calculations, account sync, or integration with the Floot dashboard. Those items must be completed before this can be treated as the finished V2 application.
 
-## Build
-GitHub Actions builds a debug APK on pushes to `main`. Open the repository's **Actions** tab, select the latest successful **Build Android APK** run, and download the `driver-profit-assistant-debug` artifact.
+- Automatic reading and OCR are implemented in the Android source, but have **not yet been validated on a real inDrive screen/device**. Treat detected values and recommendations as estimates and check every offer.
+- Offers with missing or ambiguous fare, distance, or duration details may not be recorded or may require manual checking.
+- The web app and Android companion currently keep separate local histories. Automatic cross-app/cloud sync is not implemented yet.
+- Area notes are reminders only; there is no live map or safety verification.
+- No part of IndAssistant taps Accept or Reject. The driver makes the final decision.
+- The Android APK is a debug/testing build, not a Play Store release.
 
-A debug APK is for installation/testing, not a Play Store release.
+## Repository
+
+Android package ID: `za.co.driverprofit.assistant` (kept stable for future updates).
