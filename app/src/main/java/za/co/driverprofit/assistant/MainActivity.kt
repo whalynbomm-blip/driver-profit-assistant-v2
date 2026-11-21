@@ -1,7 +1,10 @@
 package za.co.driverprofit.assistant
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.ViewGroup
@@ -56,6 +59,10 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                 }
             }
+        })
+        root.addView(Button(this).apply {
+            text = "3. Enable notifications"
+            setOnClickListener { requestNotificationPermission() }
         })
         readerButton = Button(this).apply { setOnClickListener { toggleReader() } }
         root.addView(readerButton)
@@ -163,6 +170,18 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::historyText.isInitialized) refreshHistory()
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7301)
+            } else {
+                android.widget.Toast.makeText(this, "Notifications are already enabled", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            android.widget.Toast.makeText(this, "This Android version does not require notification permission", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun toggleReader() {
