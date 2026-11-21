@@ -25,7 +25,11 @@ class OfferAccessibilityService : AccessibilityService() {
         collectText(root, collected)
         val text = collected.toString().trim()
         if (text.isBlank() || text == lastOffer) return
-        val parsed = OfferParser.parse(text) ?: return
+        val parsed = OfferParser.parse(
+            text,
+            prefs.getFloat("cost_per_km", 2.50f).toDouble(),
+            prefs.getFloat("minimum_hourly_net", 100f).toDouble()
+        ) ?: return
         lastOffer = text
         showOverlay(parsed)
     }
@@ -45,7 +49,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if (!android.provider.Settings.canDrawOverlays(this)) return
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val label = TextView(this).apply {
-            text = "DPA • ${offer.fare}\n${offer.summary}\nReview trip before accepting"
+            text = "DPA • ${offer.decision}\nFare: ${offer.fare}\n${offer.summary}\n${offer.reason}\nReview before accepting"
             textSize = 14f
             setTextColor(0xFFFFFFFF.toInt())
             setPadding(24, 18, 24, 18)
@@ -55,8 +59,7 @@ class OfferAccessibilityService : AccessibilityService() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             if (android.os.Build.VERSION.SDK_INT >= 26)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else WindowManager.LayoutParams.TYPE_PHONE,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -73,9 +76,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun hideOverlay() {
         val view = overlay ?: return
-        try {
-            (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(view)
-        } catch (_: Exception) { }
+        try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(view) } catch (_: Exception) { }
         overlay = null
     }
 
@@ -84,22 +85,34 @@ class OfferAccessibilityService : AccessibilityService() {
 }
 
 private object OfferParser {
-    data class Offer(val fare: String, val summary: String)
+    data class Offer(val fare: String, val summary: String, val decision: String, val reason: String)
 
-    fun parse(raw: String): Offer? {
+    fun parse(raw: String, costPerKm: Double, minimumHourlyNet: Double): Offer? {
         val s = raw.replace(',', '.')
-        val money = Regex("(R\\s?\\d+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?\\s?ZAR)", RegexOption.IGNORE_CASE)
-            .find(s)?.value ?: return null
-        val distance = Regex("(\\d+(?:\\.\\d+)?)\\s?km", RegexOption.IGNORE_CASE)
-            .findAll(s).map { it.groupValues[1] + " km" }.toList()
-        val duration = Regex("(\\d+)\\s?(min|mins|minutes)", RegexOption.IGNORE_CASE)
-            .find(s)?.value
-        val destination = s.lineSequence().map { it.trim() }
-            .firstOrNull { it.length in 4..48 && it.any(Char::isLetter) && !it.contains(money, true) }
-        val details = mutableListOf<String>()
-        if (distance.isNotEmpty()) details.add(distance.distinct().joinToString(" • "))
-        if (duration != null) details.add(duration)
-        if (destination != null) details.add(destination)
-        return Offer(money, if (details.isEmpty()) "Offer detected — check trip details" else details.joinToString(" • "))
+        val moneyMatch = Regex("(R\\s?\\d+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?\\s?ZAR)", RegexOption.IGNORE_CASE).find(s)
+            ?: return null
+        val amount = Regex("\\d+(?:\\.\\d{1,2})?").find(moneyMatch.value)?.value?.toDoubleOrNull() ?: return null
+        val distances = Regex("(\\d+(?:\\.\\d+)?)\\s?km", RegexOption.IGNORE_CASE)
+            .findAll(s).mapNotNull { it.groupValues[1].toDoubleOrNull() }.toList()
+        val minutes = Regex("(\\d+)\\s?(?:min|mins|minutes)", RegexOption.IGNORE_CASE)
+            .find(s)?.groupValues?.get(1)?.toDoubleOrNull()
+        val summary = buildList {
+            if (distances.isNotEmpty()) add(distances.joinToString(" + ") { String.format(Locale.US, "%.1f km", it) })
+            if (minutes != null) add("${minutes.toInt()} min")
+        }.joinToString(" • ")
+        if (distances.isEmpty() || minutes == null || minutes <= 0) {
+            return Offer(moneyMatch.value, summary.ifBlank { "Offer detected" }, "CHECK DETAILS", "Distance or duration not detected — no reliable profit estimate")
+        }
+        val totalKm = distances.sum()
+        val estimatedCost = totalKm * costPerKm
+        val estimatedNet = amount - estimatedCost
+        val hourlyNet = estimatedNet / (minutes / 60.0)
+        val decision = when {
+            estimatedNet <= 0 -> "DECLINE"
+            hourlyNet >= minimumHourlyNet -> "ACCEPTABLE"
+            else -> "NEGOTIATE"
+        }
+        val reason = String.format(Locale.US, "Est. net R%.2f • R%.0f net/hour • cost R%.2f", estimatedNet, hourlyNet, estimatedCost)
+        return Offer(moneyMatch.value, summary, decision, reason)
     }
 }
