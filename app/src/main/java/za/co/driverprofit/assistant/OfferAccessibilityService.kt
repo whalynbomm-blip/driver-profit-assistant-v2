@@ -1,17 +1,28 @@
 package za.co.driverprofit.assistant
 
 import android.accessibilityservice.AccessibilityService
+import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.hardware.HardwareBuffer
+import android.os.Build
+import android.os.SystemClock
+import android.view.Display
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.Locale
 
 class OfferAccessibilityService : AccessibilityService() {
     private var overlay: TextView? = null
     private var lastOffer = ""
+    private var lastCaptureAt = 0L
+    private var captureInProgress = false
+    private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -20,18 +31,83 @@ class OfferAccessibilityService : AccessibilityService() {
             hideOverlay()
             return
         }
-        val root = rootInActiveWindow ?: return
+        val root = rootInActiveWindow
         val collected = StringBuilder()
-        collectText(root, collected)
-        val text = collected.toString().trim()
-        if (text.isBlank() || text == lastOffer) return
-        val parsed = OfferParser.parse(
+        if (root != null) {
+            collectText(root, collected)
+            root.recycle()
+        }
+        val visibleText = collected.toString().trim()
+        val parsed = if (visibleText.isNotBlank()) parseOffer(visibleText) else null
+        if (parsed != null && parsed.decision != "CHECK DETAILS") {
+            publishIfNew(visibleText, parsed)
+        } else {
+            captureScreenForOcr()
+        }
+    }
+
+    private fun parseOffer(text: String): OfferParser.Offer? {
+        val prefs = getSharedPreferences("driver_profit", MODE_PRIVATE)
+        return OfferParser.parse(
             text,
             prefs.getFloat("cost_per_km", 2.50f).toDouble(),
             prefs.getFloat("minimum_hourly_net", 100f).toDouble()
-        ) ?: return
-        lastOffer = text
-        showOverlay(parsed)
+        )
+    }
+
+    private fun publishIfNew(sourceText: String, offer: OfferParser.Offer) {
+        val key = sourceText.trim()
+        if (key.isBlank() || key == lastOffer) return
+        lastOffer = key
+        showOverlay(offer)
+    }
+
+    private fun captureScreenForOcr() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || captureInProgress) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastCaptureAt < 1400L) return
+        lastCaptureAt = now
+        captureInProgress = true
+        try {
+            takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(result: ScreenshotResult) {
+                        var bitmap: Bitmap? = null
+                        try {
+                            val hardware = result.hardwareBuffer
+                            val wrapped = Bitmap.wrapHardwareBuffer(hardware, result.colorSpace)
+                            hardware.close()
+                            bitmap = wrapped?.copy(Bitmap.Config.ARGB_8888, false)
+                            wrapped?.recycle()
+                        } catch (_: Exception) {
+                            bitmap = null
+                        }
+                        if (bitmap == null) {
+                            captureInProgress = false
+                            return
+                        }
+                        val image = InputImage.fromBitmap(bitmap, 0)
+                        recognizer.process(image)
+                            .addOnSuccessListener { visionText ->
+                                val text = visionText.text.trim()
+                                if (text.isNotBlank()) {
+                                    val offer = parseOffer(text)
+                                    if (offer != null) publishIfNew("OCR:$text", offer)
+                                }
+                            }
+                            .addOnCompleteListener {
+                                bitmap.recycle()
+                                captureInProgress = false
+                            }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        captureInProgress = false
+                    }
+                })
+        } catch (_: Exception) {
+            captureInProgress = false
+        }
     }
 
     private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder) {
@@ -58,8 +134,7 @@ class OfferAccessibilityService : AccessibilityService() {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (android.os.Build.VERSION.SDK_INT >= 26)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
+            if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -81,7 +156,11 @@ class OfferAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() { hideOverlay() }
-    override fun onDestroy() { hideOverlay(); super.onDestroy() }
+    override fun onDestroy() {
+        hideOverlay()
+        recognizer.close()
+        super.onDestroy()
+    }
 }
 
 private object OfferParser {
