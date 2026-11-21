@@ -38,7 +38,9 @@ class OfferAccessibilityService : AccessibilityService() {
         }
         val visibleText = collected.toString().trim()
         val parsed = if (visibleText.isNotBlank()) parseOffer(visibleText) else null
-        if (parsed != null && parsed.decision != "CHECK DETAILS") {
+        if (parsed != null) {
+            // Show the floating result even when details are incomplete; the overlay
+            // will clearly say CHECK DETAILS rather than silently showing nothing.
             publishIfNew(visibleText, parsed)
         } else {
             captureScreenForOcr()
