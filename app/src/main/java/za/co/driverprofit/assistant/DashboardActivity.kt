@@ -91,6 +91,27 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun getAreaPreferences(): String {
+            val prefs = getSharedPreferences("driver_profit", MODE_PRIVATE)
+            return JSONObject().apply {
+                put("preferred", JSONArray(prefs.getString("preferred_areas", "[]") ?: "[]"))
+                put("restricted", JSONArray(prefs.getString("restricted_areas", "[]") ?: "[]"))
+            }.toString()
+        }
+
+        @JavascriptInterface
+        fun saveAreaPreferences(preferredJson: String, restrictedJson: String) {
+            try {
+                val preferred = JSONArray(preferredJson)
+                val restricted = JSONArray(restrictedJson)
+                getSharedPreferences("driver_profit", MODE_PRIVATE).edit()
+                    .putString("preferred_areas", preferred.toString())
+                    .putString("restricted_areas", restricted.toString())
+                    .apply()
+            } catch (_: Exception) { }
+        }
+
+        @JavascriptInterface
         fun saveProfitSettings(costKm: Double, targetHour: Double) {
             if (costKm < 0 || targetHour < 0 || costKm.isNaN() || targetHour.isNaN()) return
             getSharedPreferences("driver_profit", MODE_PRIVATE).edit()
