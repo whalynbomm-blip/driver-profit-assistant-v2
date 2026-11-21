@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101827"><meta name="description" content="IndAssistant driver earnings and trip profit assistant">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>IndAssistant</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--panel2:#1a2940;--line:#293a53;--text:#f3f6fb;--muted:#a5b3c7;--accent:#6ee7b7;--red:#fb7185;--amber:#fbbf24}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif;padding-bottom:84px}header{padding:20px 18px 14px;background:#101827;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}header .sub{color:var(--muted);font-size:12px;margin-top:3px}.brand{font-size:23px;font-weight:800;letter-spacing:.2px}.wrap{max-width:760px;margin:auto;padding:16px}.tabs{position:fixed;bottom:0;left:0;right:0;background:#101827;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 4px max(8px,env(safe-area-inset-bottom));z-index:8}.tabs button{background:none;border:0;color:var(--muted);font-size:11px;padding:7px 4px;min-width:58px}.tabs button.active{color:var(--accent)}.tabs b{display:block;font-size:19px;margin-bottom:2px}.page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:12px}.metric{font-size:25px;font-weight:800;margin-top:5px}.muted,.hint{color:var(--muted)}.small{font-size:12px}.row{display:flex;align-items:center;justify-content:space-between;gap:10px}.section{font-size:17px;font-weight:750;margin:20px 0 10px}.pill{border-radius:99px;padding:5px 9px;font-size:11px;font-weight:800;background:#26364d;color:var(--muted)}.good{color:var(--accent)}.bad{color:var(--red)}.warn{color:var(--amber)}label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}input,select,textarea{width:100%;background:#0d1727;border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--text);font:inherit}button.primary{background:var(--accent);color:#06251b;font-weight:800;border:0;border-radius:11px;padding:13px 16px;width:100%;margin-top:14px;font:inherit}button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit}button.danger{color:var(--red);background:transparent;border:1px solid #713448;border-radius:10px;padding:10px 12px}.result{border-radius:14px;padding:15px;background:#102b29;border:1px solid #245b4d;margin-top:14px}.result h2{margin:5px 0;font-size:27px}.listitem{padding:12px 0;border-bottom:1px solid var(--line)}.listitem:last-child{border:0}.empty{text-align:center;padding:25px;color:var(--muted)}.toggle{display:flex;align-items:center;gap:9px}.toggle input{width:auto;accent-color:var(--accent)}.notice{background:#2c2818;border:1px solid #66521c;color:#f8dfa0;padding:12px;border-radius:12px;font-size:12px;line-height:1.5}.hidden{display:none!important}
+</style></head>
+<body>
+<header><div class="brand">IndAssistant</div><div class="sub">Intelligent Driver Earnings Assistant</div></header>
+<main class="wrap">
+<section id="dashboard" class="page active">
+<div class="row"><div><div class="muted small">TODAY'S ESTIMATED NET</div><div class="metric" id="todayNet">R0.00</div></div><span class="pill" id="todayCount">0 offers logged</span></div>
+<div class="grid" style="margin-top:14px"><div class="card"><div class="muted small">Offers recorded</div><div class="metric" id="totalOffers">0</div></div><div class="card"><div class="muted small">Estimated net total</div><div class="metric" id="allNet">R0.00</div></div></div>
+<div class="section">Quick offer check</div><div class="card"><div class="muted">Enter an offer to estimate whether it is worth taking.</div><button class="primary" onclick="showPage('calculator')">Analyse an offer</button></div>
+<div class="section">Recent offers</div><div class="card" id="recentList"><div class="empty">Your saved offers will appear here.</div></div>
+<div class="notice">IndAssistant provides estimates, not guaranteed earnings. Check the offer details and your real vehicle costs before deciding. It never accepts or rejects trips for you.</div>
+</section>
+<section id="calculator" class="page">
+<div class="section" style="margin-top:4px">Offer profit calculator</div><div class="card">
+<label>Offer fare (R)</label><input id="fare" type="number" min="0" step=".01" placeholder="e.g. 85">
+<div class="grid"><div><label>Distance to pickup (km)</label><input id="pickup" type="number" min="0" step=".1" placeholder="0"></div><div><label>Passenger trip (km)</label><input id="trip" type="number" min="0" step=".1" placeholder="e.g. 12"></div></div>
+<label>Estimated total time (minutes)</label><input id="minutes" type="number" min="1" step="1" placeholder="e.g. 25">
+<label>Destination / notes (optional)</label><input id="destination" type="text" placeholder="Area or destination">
+<button class="primary" onclick="analyseOffer()">Calculate recommendation</button>
+<div id="calcResult" class="hidden"></div>
+</div><div class="hint small">The calculation includes pickup distance plus passenger trip distance. If pickup distance is unknown, enter 0 only if you are already at the pickup point.</div>
+</section>
+<section id="history" class="page">
+<div class="row"><div class="section" style="margin:4px 0 10px">Offer history</div><button class="secondary" onclick="exportCSV()">Export CSV</button></div>
+<div class="grid"><div class="card"><div class="small muted">Recorded fares</div><div class="metric" id="histFare">R0</div></div><div class="card"><div class="small muted">Estimated net</div><div class="metric" id="histNet">R0</div></div></div>
+<div class="card" id="historyList"><div class="empty">No offers recorded yet.</div></div>
+</section>
+<section id="expenses" class="page">
+<div class="section" style="margin-top:4px">Vehicle costs</div><div class="card">
+<label>Running cost per kilometre (R/km)</label><input id="costKm" type="number" min="0" step=".01">
+<label>Minimum target net per hour (R)</label><input id="targetHour" type="number" min="0" step="1">
+<label>Additional fixed cost per offer (R, optional)</label><input id="fixedCost" type="number" min="0" step=".01">
+<button class="primary" onclick="saveSettings()">Save cost settings</button><p class="hint small">Set these values from your own fuel, maintenance, tyres, insurance and other operating costs. The default values are examples, not personalised advice.</p>
+</div>
+<div class="section">Area notes</div><div class="card"><label>Restricted / avoid areas (one per line)</label><textarea id="areas" rows="5" placeholder="Add areas you prefer to avoid"></textarea><button class="primary" onclick="saveAreas()">Save area notes</button><div class="hint small" style="margin-top:9px">These are reminders only; the app does not currently use live maps or automatically verify safety.</div></div>
+<div class="section">Data</div><div class="card"><div class="muted small">Your records are stored locally in this browser on this device.</div><button class="secondary" style="margin-top:12px;width:100%" onclick="exportBackup()">Export backup JSON</button><button class="danger" style="margin-top:10px;width:100%" onclick="clearAll()">Delete all local data</button></div>
+</section>
+</main>
+<nav class="tabs">
+<button class="active" data-page="dashboard" onclick="showPage('dashboard')"><b>⌂</b>Home</button>
+<button data-page="calculator" onclick="showPage('calculator')"><b>◉</b>Offer</button>
+<button data-page="history" onclick="showPage('history')"><b>▤</b>History</button>
+<button data-page="expenses" onclick="showPage('expenses')"><b>⚙</b>Costs</button>
+</nav>
+<script>
+const KEY='indassistant.v1';
+const defaults={costKm:2.5,targetHour:100,fixedCost:0,areas:'',offers:[]};
+let data=load();
+function load(){try{return Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){return {...defaults}}}
+function persist(){localStorage.setItem(KEY,JSON.stringify(data));render()}
+function money(n){return 'R'+Number(n||0).toFixed(2)}
+function num(id){return Math.max(0,Number(document.getElementById(id).value)||0)}
+function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));if(id==='history'||id==='dashboard')render()}
+function recommendation(net,hour){if(net<=0)return ['DECLINE','bad'];if(hour>=Number(data.targetHour))return ['ACCEPTABLE','good'];return ['NEGOTIATE','warn']}
+function analyseOffer(){
+ const fare=num('fare'),pickup=num('pickup'),trip=num('trip'),minutes=num('minutes');
+ if(fare<=0||trip<=0||minutes<=0){alert('Please enter a fare, passenger trip distance and estimated time.');return}
+ const km=pickup+trip,cost=km*Number(data.costKm)+Number(data.fixedCost),net=fare-cost,hour=net/(minutes/60),rec=recommendation(net,hour);
+ const offer={id:Date.now(),date:new Date().toISOString(),fare,pickup,trip,km,minutes,cost,net,hour,destination:document.getElementById('destination').value.trim(),decision:rec[0]};
+ data.offers.unshift(offer);data.offers=data.offers.slice(0,500);persist();
+ document.getElementById('calcResult').className='result';
+ document.getElementById('calcResult').innerHTML='<div class="row"><b>Recommendation</b><span class="pill '+rec[1]+'">'+rec[0]+'</span></div><h2>'+money(net)+'</h2><div class="small muted">Estimated net after vehicle costs</div><div class="listitem">Total distance <b style="float:right">'+km.toFixed(1)+' km</b></div><div class="listitem">Estimated cost <b style="float:right">'+money(cost)+'</b></div><div class="listitem">Net per hour <b style="float:right">'+money(hour)+'</b></div><div class="listitem">Fare per km <b style="float:right">'+money(fare/km)+'</b></div><p class="small muted">Saved in offer history. Review the route, traffic, pickup details and actual costs yourself.</p>';
+}
+function render(){
+ const offers=data.offers||[],today=new Date().toDateString(),todays=offers.filter(o=>new Date(o.date).toDateString()===today);
+ document.getElementById('todayNet').textContent=money(todays.reduce((s,o)=>s+o.net,0));document.getElementById('todayCount').textContent=todays.length+' offers logged';
+ document.getElementById('totalOffers').textContent=offers.length;document.getElementById('allNet').textContent=money(offers.reduce((s,o)=>s+o.net,0));
+ document.getElementById('histFare').textContent=money(offers.reduce((s,o)=>s+o.fare,0));document.getElementById('histNet').textContent=money(offers.reduce((s,o)=>s+o.net,0));
+ const row=o=>'<div class="listitem"><div class="row"><b>'+money(o.fare)+' · '+o.decision+'</b><b class="'+(o.net>=0?'good':'bad')+'">'+money(o.net)+'</b></div><div class="small muted">'+new Date(o.date).toLocaleString()+' · '+Number(o.km).toFixed(1)+' km · '+o.minutes+' min'+(o.destination?' · '+escapeHtml(o.destination):'')+'</div></div>';
+ document.getElementById('recentList').innerHTML=offers.length?offers.slice(0,5).map(row).join(''):'<div class="empty">Your saved offers will appear here.</div>';
+ document.getElementById('historyList').innerHTML=offers.length?offers.map(row).join(''):'<div class="empty">No offers recorded yet.</div>';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function saveSettings(){data.costKm=num('costKm');data.targetHour=num('targetHour');data.fixedCost=num('fixedCost');persist();alert('Cost settings saved.')}
+function saveAreas(){data.areas=document.getElementById('areas').value;persist();alert('Area notes saved.')}
+function exportCSV(){const cols=['date','fare','pickup','trip','km','minutes','cost','net','hour','decision','destination'];const lines=[cols.join(','),...data.offers.map(o=>cols.map(k=>'"'+String(o[k]??'').replace(/"/g,'""')+'"').join(','))];download('indassistant-offers.csv',lines.join('\n'),'text/csv')}
+function exportBackup(){download('indassistant-backup.json',JSON.stringify(data,null,2),'application/json')}
+function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
+function clearAll(){if(confirm('Delete all saved offers, cost settings and area notes from this device?')){localStorage.removeItem(KEY);data={...defaults};init();render()}}
+function init(){document.getElementById('costKm').value=data.costKm;document.getElementById('targetHour').value=data.targetHour;document.getElementById('fixedCost').value=data.fixedCost;document.getElementById('areas').value=data.areas;render()}
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+init();
+</script></body></html>
