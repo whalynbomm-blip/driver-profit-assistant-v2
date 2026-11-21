@@ -42,6 +42,10 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 8, 0, 24)
         })
         root.addView(Button(this).apply {
+            text = "Open earnings dashboard"
+            setOnClickListener { startActivity(Intent(this@MainActivity, DashboardActivity::class.java)) }
+        })
+        root.addView(Button(this).apply {
             text = "1. Enable offer reading"
             setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         })
