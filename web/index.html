@@ -55,7 +55,7 @@
 const KEY='indassistant.v1';
 const defaults={costKm:2.5,targetHour:280,fixedCost:0,areas:'',offers:[]};
 let data=load();
-function load(){try{return Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){return {...defaults}}}
+function load(){try{const saved=Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'));if(Number(saved.targetHour)===100)saved.targetHour=280;return saved}catch(e){return {...defaults}}}
 function persist(){localStorage.setItem(KEY,JSON.stringify(data));render()}
 function money(n){return 'R'+Number(n||0).toFixed(2)}
 function num(id){return Math.max(0,Number(document.getElementById(id).value)||0)}
@@ -88,7 +88,7 @@ function syncAndroidOffers(){
   if(!window.AndroidBridge)return;
   const settings=JSON.parse(window.AndroidBridge.getProfitSettings()||"{}");
   if(Number.isFinite(Number(settings.costKm)))data.costKm=Number(settings.costKm);
-  if(Number.isFinite(Number(settings.targetHour))&&Number(settings.targetHour)>0)data.targetHour=Number(settings.targetHour);
+  if(Number.isFinite(Number(settings.targetHour))&&Number(settings.targetHour)>0)data.targetHour=Number(settings.targetHour)===100?280:Number(settings.targetHour);
   const rows=JSON.parse(window.AndroidBridge.getDetectedOffers()||"[]");
   const known=new Set((data.offers||[]).map(o=>String(o.id)));
   let added=0;
