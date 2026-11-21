@@ -52,7 +52,7 @@ class OfferAccessibilityService : AccessibilityService() {
         return OfferParser.parse(
             text,
             prefs.getFloat("cost_per_km", 2.50f).toDouble(),
-            prefs.getFloat("minimum_hourly_net", 100f).toDouble()
+            prefs.getFloat("minimum_hourly_net", 280f).toDouble()
         )
     }
 
@@ -231,9 +231,8 @@ private object OfferParser {
         val estimatedNet = fareAmount - estimatedCost
         val hourlyNet = estimatedNet / (minutes / 60.0)
         val decision = when {
-            estimatedNet <= 0 -> "DECLINE"
-            hourlyNet >= minimumHourlyNet -> "ACCEPTABLE"
-            else -> "NEGOTIATE"
+            estimatedNet <= 0 || hourlyNet < minimumHourlyNet -> "DECLINE"
+            else -> "MEETS TARGET"
         }
         val reason = String.format(Locale.US, "Est. net R%.2f • R%.0f net/hour • cost R%.2f", estimatedNet, hourlyNet, estimatedCost)
         val record = TripRecord(
