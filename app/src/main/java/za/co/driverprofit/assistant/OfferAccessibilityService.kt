@@ -52,11 +52,15 @@ class OfferAccessibilityService : AccessibilityService() {
         val savedTarget = prefs.getFloat("minimum_hourly_net", 280f)
         val target = if (savedTarget == 100f) 280f else savedTarget
         if (target != savedTarget) prefs.edit().putFloat("minimum_hourly_net", target).apply()
-        return OfferParser.parse(
-            text,
-            prefs.getFloat("cost_per_km", 2.50f).toDouble(),
-            target.toDouble()
-        )
+        val offer = OfferParser.parse(text, prefs.getFloat("cost_per_km", 2.50f).toDouble(), target.toDouble()) ?: return null
+        val preferred = try { org.json.JSONArray(prefs.getString("preferred_areas", "[]") ?: "[]") } catch (_: Exception) { org.json.JSONArray() }
+        val restricted = try { org.json.JSONArray(prefs.getString("restricted_areas", "[]") ?: "[]") } catch (_: Exception) { org.json.JSONArray() }
+        val content = text.lowercase(Locale.ROOT)
+        val restrictedMatch = (0 until restricted.length()).map { restricted.optString(it).trim() }.firstOrNull { it.isNotEmpty() && content.contains(it.lowercase(Locale.ROOT)) }
+        if (restrictedMatch != null) return offer.copy(decision = "AVOID AREA", reason = "Restricted area match: " + restrictedMatch + " • " + offer.reason, record = offer.record?.copy(decision = "AVOID AREA"))
+        val preferredMatch = (0 until preferred.length()).map { preferred.optString(it).trim() }.firstOrNull { it.isNotEmpty() && content.contains(it.lowercase(Locale.ROOT)) }
+        if (preferredMatch != null) return offer.copy(reason = "PREFERRED AREA: " + preferredMatch + " • " + offer.reason)
+        return offer
     }
 
     private fun publishIfNew(sourceText: String, offer: OfferParser.Offer) {
