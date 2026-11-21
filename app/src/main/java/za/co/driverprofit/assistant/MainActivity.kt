@@ -72,12 +72,12 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(costInput, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         root.addView(TextView(this).apply {
-            text = "Minimum target net earnings per hour (R)"
+            text = "Minimum target net per hour (R) — R280 = R70 per 15 minutes"
             setPadding(0, 12, 0, 0)
         })
         hourlyInput = EditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText(prefs.getFloat("minimum_hourly_net", 100f).toString())
+            setText(prefs.getFloat("minimum_hourly_net", 280f).toString())
             hint = "e.g. 100"
         }
         root.addView(hourlyInput, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
