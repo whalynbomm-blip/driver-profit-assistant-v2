@@ -49,10 +49,13 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun parseOffer(text: String): OfferParser.Offer? {
         val prefs = getSharedPreferences("driver_profit", MODE_PRIVATE)
+        val savedTarget = prefs.getFloat("minimum_hourly_net", 280f)
+        val target = if (savedTarget == 100f) 280f else savedTarget
+        if (target != savedTarget) prefs.edit().putFloat("minimum_hourly_net", target).apply()
         return OfferParser.parse(
             text,
             prefs.getFloat("cost_per_km", 2.50f).toDouble(),
-            prefs.getFloat("minimum_hourly_net", 280f).toDouble()
+            target.toDouble()
         )
     }
 
