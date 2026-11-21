@@ -86,7 +86,7 @@ class DashboardActivity : AppCompatActivity() {
             val prefs = getSharedPreferences("driver_profit", MODE_PRIVATE)
             return JSONObject().apply {
                 put("costKm", prefs.getFloat("cost_per_km", 2.50f).toDouble())
-                put("targetHour", prefs.getFloat("minimum_hourly_net", 100f).toDouble())
+                put("targetHour", prefs.getFloat("minimum_hourly_net", 280f).toDouble())
             }.toString()
         }
 
