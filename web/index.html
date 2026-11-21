@@ -30,7 +30,7 @@
 </div><div class="hint small">The calculation includes pickup distance plus passenger trip distance. If pickup distance is unknown, enter 0 only if you are already at the pickup point.</div>
 </section>
 <section id="history" class="page">
-<div class="row"><div class="section" style="margin:4px 0 10px">Offer history</div><button class="secondary" onclick="exportCSV()">Export CSV</button></div>
+<div class="row"><div class="section" style="margin:4px 0 10px">Offer history</div><button class="secondary" onclick="exportCSV()">Export CSV</button></div><div class="card"><div class="small muted">Bring detected offers from the Android reader into this dashboard.</div><input id="androidImportFile" type="file" accept="application/json,.json" onchange="importAndroidOffers(event)"></div>
 <div class="grid"><div class="card"><div class="small muted">Recorded fares</div><div class="metric" id="histFare">R0</div></div><div class="card"><div class="small muted">Estimated net</div><div class="metric" id="histNet">R0</div></div></div>
 <div class="card" id="historyList"><div class="empty">No offers recorded yet.</div></div>
 </section>
@@ -82,6 +82,29 @@ function render(){
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function saveSettings(){data.costKm=num('costKm');data.targetHour=num('targetHour');data.fixedCost=num('fixedCost');persist();alert('Cost settings saved.')}
 function saveAreas(){data.areas=document.getElementById('areas').value;persist();alert('Area notes saved.')}
+function importAndroidOffers(event){
+ const file=event.target.files&&event.target.files[0];if(!file)return;
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const parsed=JSON.parse(String(reader.result||""));
+   const rows=Array.isArray(parsed)?parsed:(Array.isArray(parsed.offers)?parsed.offers:null);
+   if(!rows)throw new Error("The selected file does not contain an offers list.");
+   const known=new Set((data.offers||[]).map(o=>String(o.id)));let added=0;
+   rows.forEach((r,i)=>{
+    const id=String(r.id??r.timestamp??("android-"+i));if(known.has(id))return;
+    const fare=Number(r.fare),pickup=Number(r.pickup??r.pickupKm??0),trip=Number(r.trip??r.tripKm),minutes=Number(r.minutes);
+    if(!Number.isFinite(fare)||!Number.isFinite(trip)||!Number.isFinite(minutes)||fare<0||trip<=0||minutes<=0)return;
+    const km=Number(r.km??(pickup+trip)),cost=Number(r.cost??r.estimatedCost??0),net=Number(r.net??r.estimatedNet??(fare-cost)),hour=Number(r.hour??r.netPerHour??(net/(minutes/60)));
+    data.offers.push({id:id,date:r.date||new Date(Number(r.timestamp)||Date.now()).toISOString(),fare,pickup,trip,km,minutes,cost,net,hour,destination:String(r.destination||""),decision:String(r.decision||"CHECK DETAILS"),source:"android-reader"});
+    known.add(id);added++;
+   });
+   data.offers.sort((a,b)=>new Date(b.date)-new Date(a.date));data.offers=data.offers.slice(0,500);persist();
+   alert(added+" Android offer(s) imported into this dashboard.");
+  }catch(error){alert("Could not import file: "+error.message)}
+  event.target.value="";
+ };reader.onerror=()=>alert("Could not read the selected file.");reader.readAsText(file);
+}
 function exportCSV(){const cols=['date','fare','pickup','trip','km','minutes','cost','net','hour','decision','destination'];const lines=[cols.join(','),...data.offers.map(o=>cols.map(k=>'"'+String(o[k]??'').replace(/"/g,'""')+'"').join(','))];download('indassistant-offers.csv',lines.join('\n'),'text/csv')}
 function exportBackup(){download('indassistant-backup.json',JSON.stringify(data,null,2),'application/json')}
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
