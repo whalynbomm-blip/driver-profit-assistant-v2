@@ -128,7 +128,7 @@ class OfferAccessibilityService : AccessibilityService() {
         if (!android.provider.Settings.canDrawOverlays(this)) return
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val label = TextView(this).apply {
-            text = "DPA • ${offer.decision}\nFare: ${offer.fare}\n${offer.summary}\n${offer.reason}\nReview before accepting"
+            text = "IndAssistant • ${offer.decision}\nFare: ${offer.fare}\n${offer.summary}\n${offer.reason}\nReview before accepting"
             textSize = 14f
             setTextColor(0xFFFFFFFF.toInt())
             setPadding(24, 18, 24, 18)
