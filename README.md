@@ -27,7 +27,8 @@ The reader checks accessibility text first and uses Android screen capture plus 
 
 - Automatic reading and OCR are implemented in the Android source, but have **not yet been validated on a real inDrive screen/device**. Treat detected values and recommendations as estimates and check every offer.
 - Offers with missing or ambiguous fare, distance, or duration details may not be recorded or may require manual checking.
-- The web app and Android companion currently keep separate local histories. Automatic cross-app/cloud sync is not implemented yet.
+- To move Android reader history into the dashboard: in Android IndAssistant tap **Export detected offers for web dashboard**, save the JSON file, open the web app, go to **History**, and choose the JSON file to import.
+- Android detected offers can now be exported from the Android app as a JSON file and imported into the web app from the **History** tab. This is a deliberate file-based bridge; automatic background/cloud sync is not implemented yet. Exporting and importing does not delete the Android history.
 - Area notes are reminders only; there is no live map or safety verification.
 - No part of IndAssistant taps Accept or Reject. The driver makes the final decision.
 - The Android APK is a debug/testing build, not a Play Store release.
