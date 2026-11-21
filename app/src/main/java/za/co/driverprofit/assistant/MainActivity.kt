@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(32, 40, 32, 32)
         }
         root.addView(TextView(this).apply {
-            text = "Driver Profit Assistant"
+            text = "IndAssistant"
             textSize = 25f
         })
         root.addView(TextView(this).apply {
