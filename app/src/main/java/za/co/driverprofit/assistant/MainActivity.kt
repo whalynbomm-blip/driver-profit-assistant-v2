@@ -10,6 +10,9 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.Instant
 import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -89,6 +92,17 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(historyText)
         root.addView(Button(this).apply {
+            text = "Export detected offers for web dashboard"
+            setOnClickListener {
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/json"
+                    putExtra(Intent.EXTRA_TITLE, "indassistant-android-offers.json")
+                }
+                startActivityForResult(intent, 4102)
+            }
+        })
+        root.addView(Button(this).apply {
             text = "Clear trip history"
             setOnClickListener {
                 TripHistory.clear(this@MainActivity)
@@ -106,6 +120,40 @@ class MainActivity : AppCompatActivity() {
         })
         refreshReaderButton()
         refreshHistory()
+    }
+
+    @Deprecated("Use Activity Result APIs for new integrations")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 4102 || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        try {
+            val exported = JSONArray()
+            TripHistory.read(this).forEach { item ->
+                exported.put(JSONObject().apply {
+                    put("id", item.timestamp)
+                    put("timestamp", item.timestamp)
+                    put("date", Instant.ofEpochMilli(item.timestamp).toString())
+                    put("fare", item.fare)
+                    put("pickup", item.pickupKm ?: 0.0)
+                    put("trip", item.tripKm)
+                    put("km", item.totalKm)
+                    put("minutes", item.minutes)
+                    put("cost", item.estimatedCost)
+                    put("net", item.estimatedNet)
+                    put("hour", item.netPerHour)
+                    put("destination", "")
+                    put("decision", item.decision)
+                    put("source", "android-reader")
+                })
+            }
+            contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(exported.toString(2).toByteArray(Charsets.UTF_8))
+            } ?: throw IllegalStateException("Could not open export file")
+            android.widget.Toast.makeText(this, "Android offers exported. Import this JSON in the web app History tab.", android.widget.Toast.LENGTH_LONG).show()
+        } catch (error: Exception) {
+            android.widget.Toast.makeText(this, "Export failed: " + error.message, android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onResume() {
