@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Driver Profit Assistant</string>
+    <string name="accessibility_description">Reads visible inDrive offer text when enabled to calculate trip profitability. It never accepts or rejects trips.</string>
+</resources>
