@@ -80,8 +80,31 @@ function render(){
  document.getElementById('historyList').innerHTML=offers.length?offers.map(row).join(''):'<div class="empty">No offers recorded yet.</div>';
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function saveSettings(){data.costKm=num('costKm');data.targetHour=num('targetHour');data.fixedCost=num('fixedCost');persist();alert('Cost settings saved.')}
+function saveSettings(){data.costKm=num('costKm');data.targetHour=num('targetHour');data.fixedCost=num('fixedCost');if(window.AndroidBridge)window.AndroidBridge.saveProfitSettings(data.costKm,data.targetHour);persist();alert('Cost settings saved.')}
 function saveAreas(){data.areas=document.getElementById('areas').value;persist();alert('Area notes saved.')}
+
+function syncAndroidOffers(){
+ try{
+  if(!window.AndroidBridge)return;
+  const settings=JSON.parse(window.AndroidBridge.getProfitSettings()||"{}");
+  if(Number.isFinite(Number(settings.costKm)))data.costKm=Number(settings.costKm);
+  if(Number.isFinite(Number(settings.targetHour)))data.targetHour=Number(settings.targetHour);
+  const rows=JSON.parse(window.AndroidBridge.getDetectedOffers()||"[]");
+  const known=new Set((data.offers||[]).map(o=>String(o.id)));
+  let added=0;
+  rows.forEach((r,i)=>{
+   const id=String(r.id??r.timestamp??("android-"+i));if(known.has(id))return;
+   const fare=Number(r.fare),pickup=Number(r.pickup??0),trip=Number(r.trip),minutes=Number(r.minutes);
+   if(!Number.isFinite(fare)||!Number.isFinite(trip)||!Number.isFinite(minutes)||trip<=0||minutes<=0)return;
+   const km=Number(r.km??(pickup+trip)),cost=Number(r.cost??0),net=Number(r.net??(fare-cost)),hour=Number(r.hour??(net/(minutes/60)));
+   data.offers.push({id,date:r.date||new Date(Number(r.timestamp)||Date.now()).toISOString(),fare,pickup,trip,km,minutes,cost,net,hour,destination:String(r.destination||""),decision:String(r.decision||"CHECK DETAILS"),source:"android-reader"});
+   known.add(id);added++;
+  });
+  data.offers.sort((a,b)=>new Date(b.date)-new Date(a.date));data.offers=data.offers.slice(0,500);
+  localStorage.setItem(KEY,JSON.stringify(data));init();
+ }catch(e){console.warn("Android reader sync unavailable",e)}
+}
+
 function importAndroidOffers(event){
  const file=event.target.files&&event.target.files[0];if(!file)return;
  const reader=new FileReader();
@@ -112,4 +135,5 @@ function clearAll(){if(confirm('Delete all saved offers, cost settings and area 
 function init(){document.getElementById('costKm').value=data.costKm;document.getElementById('targetHour').value=data.targetHour;document.getElementById('fixedCost').value=data.fixedCost;document.getElementById('areas').value=data.areas;render()}
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 init();
+if(window.AndroidBridge)syncAndroidOffers();
 </script></body></html>
