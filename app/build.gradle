@@ -8,7 +8,7 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'za.co.driverprofit.assistant'
+        applicationId 'za.co.driverprofit.indassistant'
         minSdk 26
         targetSdk 35
         versionCode 1
