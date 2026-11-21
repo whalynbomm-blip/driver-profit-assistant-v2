@@ -37,7 +37,7 @@
 <section id="expenses" class="page">
 <div class="section" style="margin-top:4px">Vehicle costs</div><div class="card">
 <label>Running cost per kilometre (R/km)</label><input id="costKm" type="number" min="0" step=".01">
-<label>Minimum target net per hour (R)</label><input id="targetHour" type="number" min="0" step="1">
+<label>Minimum target net per hour (R) — R280 equals R70 per 15 minutes</label><input id="targetHour" type="number" min="0" step="1">
 <label>Additional fixed cost per offer (R, optional)</label><input id="fixedCost" type="number" min="0" step=".01">
 <button class="primary" onclick="saveSettings()">Save cost settings</button><p class="hint small">Set these values from your own fuel, maintenance, tyres, insurance and other operating costs. The default values are examples, not personalised advice.</p>
 </div>
@@ -53,14 +53,14 @@
 </nav>
 <script>
 const KEY='indassistant.v1';
-const defaults={costKm:2.5,targetHour:100,fixedCost:0,areas:'',offers:[]};
+const defaults={costKm:2.5,targetHour:280,fixedCost:0,areas:'',offers:[]};
 let data=load();
 function load(){try{return Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){return {...defaults}}}
 function persist(){localStorage.setItem(KEY,JSON.stringify(data));render()}
 function money(n){return 'R'+Number(n||0).toFixed(2)}
 function num(id){return Math.max(0,Number(document.getElementById(id).value)||0)}
 function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));if(id==='history'||id==='dashboard')render()}
-function recommendation(net,hour){if(net<=0)return ['DECLINE','bad'];if(hour>=Number(data.targetHour))return ['ACCEPTABLE','good'];return ['NEGOTIATE','warn']}
+function recommendation(net,hour){if(net<=0||hour<Number(data.targetHour))return ['DECLINE','bad'];return ['MEETS TARGET','good']}
 function analyseOffer(){
  const fare=num('fare'),pickup=num('pickup'),trip=num('trip'),minutes=num('minutes');
  if(fare<=0||trip<=0||minutes<=0){alert('Please enter a fare, passenger trip distance and estimated time.');return}
@@ -88,7 +88,7 @@ function syncAndroidOffers(){
   if(!window.AndroidBridge)return;
   const settings=JSON.parse(window.AndroidBridge.getProfitSettings()||"{}");
   if(Number.isFinite(Number(settings.costKm)))data.costKm=Number(settings.costKm);
-  if(Number.isFinite(Number(settings.targetHour)))data.targetHour=Number(settings.targetHour);
+  if(Number.isFinite(Number(settings.targetHour))&&Number(settings.targetHour)>0)data.targetHour=Number(settings.targetHour);
   const rows=JSON.parse(window.AndroidBridge.getDetectedOffers()||"[]");
   const known=new Set((data.offers||[]).map(o=>String(o.id)));
   let added=0;
