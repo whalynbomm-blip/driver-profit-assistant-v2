@@ -8,14 +8,19 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var prefs: android.content.SharedPreferences
     private lateinit var readerButton: Button
     private lateinit var costInput: EditText
     private lateinit var hourlyInput: EditText
+    private lateinit var historyText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,12 +79,38 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { saveSettings() }
         })
         root.addView(TextView(this).apply {
-            text = "\nThe reader analyses visible offer text only when enabled. It does not tap Accept or Reject. Estimates depend on the information visible in the offer."
+            text = "Trip history"
+            textSize = 19f
+            setPadding(0, 28, 0, 8)
+        })
+        historyText = TextView(this).apply {
+            textSize = 14f
+            setPadding(0, 4, 0, 8)
+        }
+        root.addView(historyText)
+        root.addView(Button(this).apply {
+            text = "Clear trip history"
+            setOnClickListener {
+                TripHistory.clear(this@MainActivity)
+                refreshHistory()
+            }
+        })
+        root.addView(TextView(this).apply {
+            text = "\nThe reader analyses visible offer text and uses on-device OCR when needed. Estimates depend on what the offer screen displays. Check every recommendation yourself. The app never taps Accept or Reject."
             textSize = 13f
             setPadding(0, 20, 0, 0)
         })
-        setContentView(root)
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(root)
+        })
         refreshReaderButton()
+        refreshHistory()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::historyText.isInitialized) refreshHistory()
     }
 
     private fun toggleReader() {
@@ -105,5 +136,27 @@ class MainActivity : AppCompatActivity() {
             .putFloat("minimum_hourly_net", hourly)
             .apply()
         android.widget.Toast.makeText(this, "Profit settings saved", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun refreshHistory() {
+        val records = TripHistory.read(this)
+        if (records.isEmpty()) {
+            historyText.text = "No offers recorded yet. Detected offers with enough distance and time details will appear here."
+            return
+        }
+        val totalNet = records.sumOf { it.estimatedNet }
+        val totalFare = records.sumOf { it.fare }
+        val formatter = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
+        val lines = records.take(15).map { item ->
+            val date = formatter.format(Date(item.timestamp))
+            val pickup = item.pickupKm?.let { "Pickup %.1f km • ".format(Locale.US, it) } ?: ""
+            "$date\nR%.2f fare • %sTrip %.1f km • %.0f min\nEst. net R%.2f • %s".format(
+                Locale.US, item.fare, pickup, item.tripKm, item.minutes,
+                item.estimatedNet, item.decision
+            )
+        }
+        historyText.text = "Recorded offers: ${records.size} (latest 15 shown)\nTotal recorded fares: R%.2f\nTotal estimated net: R%.2f\n\n%s".format(
+            Locale.US, totalFare, totalNet, lines.joinToString("\n\n")
+        )
     }
 }
