@@ -49,10 +49,7 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun parseOffer(text: String): OfferParser.Offer? {
         val prefs = getSharedPreferences("driver_profit", MODE_PRIVATE)
-        val savedTarget = prefs.getFloat("minimum_hourly_net", 280f)
-        val target = if (savedTarget == 100f) 280f else savedTarget
-        if (target != savedTarget) prefs.edit().putFloat("minimum_hourly_net", target).apply()
-        val offer = OfferParser.parse(text, prefs.getFloat("cost_per_km", 2.50f).toDouble(), target.toDouble()) ?: return null
+        val offer = OfferParser.parse(text, prefs.getFloat("cost_per_km", 2.50f).toDouble()) ?: return null
         val preferred = try { org.json.JSONArray(prefs.getString("preferred_areas", "[]") ?: "[]") } catch (_: Exception) { org.json.JSONArray() }
         val restricted = try { org.json.JSONArray(prefs.getString("restricted_areas", "[]") ?: "[]") } catch (_: Exception) { org.json.JSONArray() }
         val content = text.lowercase(Locale.ROOT)
@@ -100,11 +97,7 @@ class OfferAccessibilityService : AccessibilityService() {
                             val text = visionText.text.trim()
                             if (text.isNotBlank()) {
                                 val offer = parseOffer(text)
-                                if (offer != null && offer.decision != "CHECK DETAILS") {
-                                    publishIfNew("OCR:$text", offer)
-                                } else if (offer != null) {
-                                    showOverlay(offer)
-                                }
+                                if (offer != null) { if (offer.decision == "CHECK DETAILS") showOverlay(offer) else publishIfNew("OCR:$text", offer) }
                             }
                         }
                         .addOnCompleteListener {
@@ -135,9 +128,10 @@ class OfferAccessibilityService : AccessibilityService() {
 
     private fun showOverlay(offer: OfferParser.Offer) {
         if (!android.provider.Settings.canDrawOverlays(this)) return
+        if (!getSharedPreferences("driver_profit", MODE_PRIVATE).getBoolean("overlay_enabled", true)) return
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val label = TextView(this).apply {
-            text = "IndAssistant • ${offer.decision}\nFare: ${offer.fare}\n${offer.summary}\n${offer.reason}\nReview before accepting"
+            text = "IndAssistant OCR  •  ${offer.decision}\nFare: ${offer.fare}\n${offer.summary}\n${offer.reason}\nYou make the final decision"
             textSize = 14f
             setTextColor(0xFFFFFFFF.toInt())
             setPadding(24, 18, 24, 18)
@@ -187,7 +181,7 @@ private object OfferParser {
     private val distanceRegex = Regex("(\\d+(?:[.,]\\d+)?)\\s?km", RegexOption.IGNORE_CASE)
     private val durationRegex = Regex("(\\d+)\\s?(?:min|mins|minutes)", RegexOption.IGNORE_CASE)
 
-    fun parse(raw: String, costPerKm: Double, minimumHourlyNet: Double): Offer? {
+    fun parse(raw: String, costPerKm: Double): Offer? {
         val normalized = raw.replace(',', '.')
         val moneyMatch = Regex("(R\\s?\\d+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?\\s?ZAR)", RegexOption.IGNORE_CASE).find(normalized)
             ?: return null
@@ -237,11 +231,18 @@ private object OfferParser {
         val estimatedCost = totalKm * costPerKm
         val estimatedNet = fareAmount - estimatedCost
         val hourlyNet = estimatedNet / (minutes / 60.0)
-        val decision = when {
-            estimatedNet <= 0 || hourlyNet < minimumHourlyNet -> "DECLINE"
-            else -> "MEETS TARGET"
+        val minimumNet = when {
+            minutes <= 15.0 -> 60.0 * (minutes / 15.0)
+            minutes <= 20.0 -> 80.0
+            minutes < 25.0 -> 80.0 + (minutes - 20.0) * 6.0
+            minutes <= 30.0 -> 110.0
+            else -> 110.0 * (minutes / 30.0)
         }
-        val reason = String.format(Locale.US, "Est. net R%.2f • R%.0f net/hour • cost R%.2f", estimatedNet, hourlyNet, estimatedCost)
+        val decision = when {
+            estimatedNet <= 0 || estimatedNet < minimumNet -> "DECLINE"
+            else -> "ACCEPT"
+        }
+        val reason = String.format(Locale.US, "Est. net R%.2f • target R%.0f • cost R%.2f • R%.0f net/hour", estimatedNet, minimumNet, estimatedCost, hourlyNet)
         val record = TripRecord(
             timestamp = System.currentTimeMillis(),
             fare = fareAmount,
