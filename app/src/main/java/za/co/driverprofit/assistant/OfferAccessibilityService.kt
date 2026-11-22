@@ -232,8 +232,8 @@ private object OfferParser {
         val estimatedNet = fareAmount - estimatedCost
         val hourlyNet = estimatedNet / (minutes / 60.0)
         val minimumNet = when {
-            minutes <= 15.0 -> 60.0 * (minutes / 15.0)
-            minutes <= 20.0 -> 80.0
+            minutes <= 15.0 -> 60.0
+            minutes <= 20.0 -> 60.0 + (minutes - 15.0) * 4.0
             minutes < 25.0 -> 80.0 + (minutes - 20.0) * 6.0
             minutes <= 30.0 -> 110.0
             else -> 110.0 * (minutes / 30.0)
