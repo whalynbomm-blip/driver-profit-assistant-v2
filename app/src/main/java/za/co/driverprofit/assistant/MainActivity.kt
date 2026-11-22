@@ -7,227 +7,189 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.graphics.Color
+import android.graphics.Typeface
+import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import org.json.JSONArray
-import org.json.JSONObject
-import java.time.Instant
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var prefs: android.content.SharedPreferences
+    private val prefs by lazy { getSharedPreferences("driver_profit", MODE_PRIVATE) }
+    private lateinit var status: TextView
     private lateinit var readerButton: Button
+    private lateinit var overlayButton: Button
     private lateinit var costInput: EditText
-    private lateinit var hourlyInput: EditText
+    private lateinit var preferredList: LinearLayout
+    private lateinit var restrictedList: LinearLayout
     private lateinit var historyText: TextView
+    private val bg = Color.rgb(12, 16, 22)
+    private val card = Color.rgb(25, 32, 42)
+    private val green = Color.rgb(160, 255, 35)
+    private val muted = Color.rgb(164, 177, 192)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        prefs = getSharedPreferences("driver_profit", MODE_PRIVATE)
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        window.decorView.systemUiVisibility = 0
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 40, 32, 32)
+            setPadding(dp(18), dp(20), dp(18), dp(28))
+            setBackgroundColor(bg)
         }
-        root.addView(TextView(this).apply {
-            text = "IndAssistant"
-            textSize = 25f
-        })
-        root.addView(TextView(this).apply {
-            text = "Android offer reader • V2 companion"
-            textSize = 15f
-            setPadding(0, 8, 0, 24)
-        })
-        root.addView(Button(this).apply {
-            text = "Open earnings dashboard"
-            setOnClickListener { startActivity(Intent(this@MainActivity, DashboardActivity::class.java)) }
-        })
-        root.addView(Button(this).apply {
-            text = "1. Enable offer reading"
-            setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-        })
-        root.addView(Button(this).apply {
-            text = "2. Allow floating assistant"
-            setOnClickListener {
-                if (!Settings.canDrawOverlays(this@MainActivity)) {
-                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-                }
-            }
-        })
-        root.addView(Button(this).apply {
-            text = "3. Enable notifications"
-            setOnClickListener { requestNotificationPermission() }
-        })
-        readerButton = Button(this).apply { setOnClickListener { toggleReader() } }
+        root.addView(label("IndAssistant OCR", 27, Color.WHITE, true))
+        root.addView(label("DRIVER PROFIT ASSISTANT  •  INDEPENDENT OCR", 11, green, true).apply { setPadding(0, dp(4), 0, dp(18)) })
+        val statusCard = panel()
+        status = label("READY TO CONFIGURE", 13, green, true)
+        statusCard.addView(status)
+        statusCard.addView(label("Reads visible inDrive offers and estimates your net after vehicle costs. You always make the final decision.", 13, muted, false).apply { setPadding(0, dp(8), 0, 0) })
+        root.addView(statusCard)
+        root.addView(section("ASSISTANT CONTROLS"))
+        readerButton = actionButton("")
+        readerButton.setOnClickListener { prefs.edit().putBoolean("reader_enabled", !prefs.getBoolean("reader_enabled", true)).apply(); refreshControls() }
         root.addView(readerButton)
-        root.addView(TextView(this).apply {
-            text = "Profit settings"
-            textSize = 19f
-            setPadding(0, 28, 0, 8)
-        })
-        root.addView(TextView(this).apply { text = "Estimated vehicle cost per km (R)" })
-        costInput = EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText(prefs.getFloat("cost_per_km", 2.50f).toString())
-            hint = "e.g. 2.50"
-        }
-        root.addView(costInput, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        root.addView(TextView(this).apply {
-            text = "Minimum target net per hour (R) — R280 = R70 per 15 minutes"
-            setPadding(0, 12, 0, 0)
-        })
-        hourlyInput = EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText(prefs.getFloat("minimum_hourly_net", 280f).toString())
-            hint = "e.g. 100"
-        }
-        root.addView(hourlyInput, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        root.addView(Button(this).apply {
-            text = "Save profit settings"
-            setOnClickListener { saveSettings() }
-        })
-        root.addView(TextView(this).apply {
-            text = "Trip history"
-            textSize = 19f
-            setPadding(0, 28, 0, 8)
-        })
-        historyText = TextView(this).apply {
-            textSize = 14f
-            setPadding(0, 4, 0, 8)
-        }
-        root.addView(historyText)
-        root.addView(Button(this).apply {
-            text = "Export detected offers for web dashboard"
-            setOnClickListener {
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "application/json"
-                    putExtra(Intent.EXTRA_TITLE, "indassistant-android-offers.json")
-                }
-                startActivityForResult(intent, 4102)
+        overlayButton = actionButton("")
+        overlayButton.setOnClickListener {
+            if (!Settings.canDrawOverlays(this)) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + packageName)))
+            } else {
+                prefs.edit().putBoolean("overlay_enabled", !prefs.getBoolean("overlay_enabled", true)).apply()
+                refreshControls()
             }
-        })
-        root.addView(Button(this).apply {
-            text = "Clear trip history"
-            setOnClickListener {
-                TripHistory.clear(this@MainActivity)
-                refreshHistory()
-            }
-        })
-        root.addView(TextView(this).apply {
-            text = "\nThe reader analyses visible offer text and uses on-device OCR when needed. Estimates depend on what the offer screen displays. Check every recommendation yourself. The app never taps Accept or Reject."
-            textSize = 13f
-            setPadding(0, 20, 0, 0)
-        })
-        setContentView(ScrollView(this).apply {
-            isFillViewport = true
-            addView(root)
-        })
-        refreshReaderButton()
+        }
+        root.addView(overlayButton)
+        root.addView(actionButton("OPEN ACCESSIBILITY SETTINGS").apply { setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } })
+        root.addView(actionButton("ALLOW NOTIFICATIONS").apply { setOnClickListener { requestNotifications() } })
+        root.addView(section("YOUR VEHICLE • FORD FIGO 2014"))
+        val costCard = panel()
+        costCard.addView(label("Estimated total running cost per kilometre (R)", 13, muted, false))
+        costInput = edit(prefs.getFloat("cost_per_km", 2.50f).toString(), "e.g. 2.50")
+        costCard.addView(costInput)
+        costCard.addView(label("Enter your fuel, servicing, tyres and other running costs combined into one per-km estimate. You can change this any time.", 12, muted, false))
+        costCard.addView(actionButton("SAVE VEHICLE COST").apply { setOnClickListener { saveCost() } })
+        root.addView(costCard)
+        root.addView(section("FIXED NET EARNINGS TARGETS"))
+        val targets = panel()
+        targets.addView(label("10–15 min     R60–R70 net", 16, green, true))
+        targets.addView(label("Around 20 min     R80–R90 net", 15, Color.WHITE, true).apply { setPadding(0, dp(10), 0, 0) })
+        targets.addView(label("25–30 min     R110–R140 net", 15, Color.WHITE, true).apply { setPadding(0, dp(10), 0, 0) })
+        targets.addView(label("Recommendations use the lower end of each target band as the minimum. Estimated net is fare minus estimated vehicle cost.", 12, muted, false).apply { setPadding(0, dp(12), 0, 0) })
+        root.addView(targets)
+        root.addView(section("AREA PREFERENCES"))
+        val prefCard = panel()
+        prefCard.addView(label("PREFERRED AREAS", 13, green, true))
+        preferredList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        prefCard.addView(preferredList)
+        prefCard.addView(actionButton("+ ADD PREFERRED AREA").apply { setOnClickListener { addArea(true) } })
+        root.addView(prefCard)
+        val restrictedCard = panel()
+        restrictedCard.addView(label("RESTRICTED / NO-GO AREAS", 13, Color.rgb(255, 120, 105), true))
+        restrictedList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        restrictedCard.addView(restrictedList)
+        restrictedCard.addView(actionButton("+ ADD RESTRICTED AREA").apply { setOnClickListener { addArea(false) } })
+        root.addView(restrictedCard)
+        root.addView(section("RECENT OFFER HISTORY"))
+        val historyCard = panel()
+        historyText = label("No offers recorded yet.", 13, muted, false)
+        historyCard.addView(historyText)
+        historyCard.addView(actionButton("CLEAR HISTORY").apply { setOnClickListener { TripHistory.clear(this@MainActivity); refreshHistory() } })
+        root.addView(historyCard)
+        root.addView(label("Privacy and safety: offer text is processed on your device. OCR estimates can be wrong if details are hidden or unclear. Check every offer yourself. This app never taps Accept or Reject.", 12, muted, false).apply { setPadding(dp(4), dp(20), dp(4), 0) })
+        setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) })
+        refreshControls()
+        refreshAreas()
         refreshHistory()
     }
 
-    @Deprecated("Use Activity Result APIs for new integrations")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != 4102 || resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
-        try {
-            val exported = JSONArray()
-            TripHistory.read(this).forEach { item ->
-                exported.put(JSONObject().apply {
-                    put("id", item.timestamp)
-                    put("timestamp", item.timestamp)
-                    put("date", Instant.ofEpochMilli(item.timestamp).toString())
-                    put("fare", item.fare)
-                    put("pickup", item.pickupKm ?: 0.0)
-                    put("trip", item.tripKm)
-                    put("km", item.totalKm)
-                    put("minutes", item.minutes)
-                    put("cost", item.estimatedCost)
-                    put("net", item.estimatedNet)
-                    put("hour", item.netPerHour)
-                    put("destination", "")
-                    put("decision", item.decision)
-                    put("source", "android-reader")
-                })
-            }
-            contentResolver.openOutputStream(uri)?.use { stream ->
-                stream.write(exported.toString(2).toByteArray(Charsets.UTF_8))
-            } ?: throw IllegalStateException("Could not open export file")
-            android.widget.Toast.makeText(this, "Android offers exported. Import this JSON in the web app History tab.", android.widget.Toast.LENGTH_LONG).show()
-        } catch (error: Exception) {
-            android.widget.Toast.makeText(this, "Export failed: " + error.message, android.widget.Toast.LENGTH_LONG).show()
+    override fun onResume() { super.onResume(); if (::status.isInitialized) refreshControls(); if (::historyText.isInitialized) refreshHistory() }
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun label(value: String, size: Int, color: Int, bold: Boolean) = TextView(this).apply {
+        text = value; textSize = size.toFloat(); setTextColor(color)
+        if (bold) setTypeface(typeface, Typeface.BOLD)
+    }
+    private fun panel() = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(15), dp(16), dp(15)); setBackgroundColor(card)
+        val lp = LinearLayout.LayoutParams(-1, -2); lp.bottomMargin = dp(10); layoutParams = lp
+    }
+    private fun section(value: String) = label(value, 12, muted, true).apply { setPadding(dp(3), dp(20), 0, dp(9)) }
+    private fun actionButton(value: String) = Button(this).apply {
+        text = value; textSize = 12f; isAllCaps = false; setTextColor(Color.WHITE)
+        setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(42, 55, 70)))
+        val lp = LinearLayout.LayoutParams(-1, dp(48)); lp.topMargin = dp(8); layoutParams = lp
+    }
+    private fun edit(value: String, hintText: String) = EditText(this).apply {
+        setText(value); hint = hintText; textSize = 16f; setTextColor(Color.WHITE); setHintTextColor(muted)
+        inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        setSingleLine(true)
+    }
+    private fun refreshControls() {
+        val read = prefs.getBoolean("reader_enabled", true)
+        val over = prefs.getBoolean("overlay_enabled", true)
+        readerButton.text = if (read) "OFFER READER: ON  •  TAP TO TURN OFF" else "OFFER READER: OFF  •  TAP TO TURN ON"
+        overlayButton.text = if (!Settings.canDrawOverlays(this)) "FLOATING ASSISTANT: PERMISSION NEEDED" else if (over) "FLOATING ASSISTANT: ON  •  TAP TO TURN OFF" else "FLOATING ASSISTANT: OFF  •  TAP TO TURN ON"
+        status.text = if (read && Settings.canDrawOverlays(this) && over) "ASSISTANT CONFIGURED • READY TO READ" else "SETUP REQUIRED • CHECK CONTROLS BELOW"
+    }
+    private fun saveCost() {
+        val value = costInput.text.toString().toFloatOrNull()
+        if (value == null || value < 0f) { costInput.error = "Enter a valid amount"; return }
+        prefs.edit().putFloat("cost_per_km", value).apply()
+        Toast.makeText(this, "Vehicle cost saved", Toast.LENGTH_SHORT).show()
+    }
+    private fun requestNotifications() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7301)
+        else Toast.makeText(this, "Notification permission is already available or not required on this Android version.", Toast.LENGTH_SHORT).show()
+    }
+    private fun readAreas(key: String): MutableList<String> {
+        val arr = try { org.json.JSONArray(prefs.getString(key, "[]") ?: "[]") } catch (_: Exception) { org.json.JSONArray() }
+        return (0 until arr.length()).map { arr.optString(it).trim() }.filter { it.isNotBlank() }.toMutableList()
+    }
+    private fun saveAreas(key: String, values: List<String>) {
+        val arr = org.json.JSONArray(); values.forEach { arr.put(it) }; prefs.edit().putString(key, arr.toString()).apply()
+    }
+    private fun refreshAreas() {
+        if (!::preferredList.isInitialized) return
+        renderAreas(preferredList, "preferred_areas", true)
+        renderAreas(restrictedList, "restricted_areas", false)
+    }
+    private fun renderAreas(container: LinearLayout, key: String, preferred: Boolean) {
+        container.removeAllViews()
+        val values = readAreas(key)
+        if (values.isEmpty()) container.addView(label("None added yet", 12, muted, false).apply { setPadding(0, dp(8), 0, dp(4)) })
+        values.forEach { value ->
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val name = label(value, 14, Color.WHITE, false); line.addView(name, LinearLayout.LayoutParams(0, -2, 1f))
+            line.addView(Button(this).apply {
+                text = "REMOVE"; textSize = 10f; setOnClickListener { val next = readAreas(key).apply { remove(value) }; saveAreas(key, next); refreshAreas() }
+            })
+            container.addView(line)
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        if (::historyText.isInitialized) refreshHistory()
+    private fun addArea(preferred: Boolean) {
+        val input = EditText(this).apply { hint = "Area or suburb name" }
+        AlertDialog.Builder(this).setTitle(if (preferred) "Add preferred area" else "Add restricted / no-go area")
+            .setView(input).setNegativeButton("Cancel", null).setPositiveButton("Save") { _, _ ->
+                val value = input.text.toString().trim()
+                if (value.isNotBlank()) {
+                    val key = if (preferred) "preferred_areas" else "restricted_areas"
+                    val values = readAreas(key)
+                    if (values.none { it.equals(value, true) }) values.add(value)
+                    saveAreas(key, values); refreshAreas()
+                }
+            }.show()
     }
-
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7301)
-            } else {
-                android.widget.Toast.makeText(this, "Notifications are already enabled", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            android.widget.Toast.makeText(this, "This Android version does not require notification permission", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun toggleReader() {
-        val enabled = !prefs.getBoolean("reader_enabled", true)
-        prefs.edit().putBoolean("reader_enabled", enabled).apply()
-        refreshReaderButton()
-    }
-
-    private fun refreshReaderButton() {
-        readerButton.text = if (prefs.getBoolean("reader_enabled", true))
-            "Offer reading: ON — tap to turn OFF" else "Offer reading: OFF — tap to turn ON"
-    }
-
-    private fun saveSettings() {
-        val cost = costInput.text.toString().toFloatOrNull()
-        val hourly = hourlyInput.text.toString().toFloatOrNull()
-        if (cost == null || hourly == null || cost < 0 || hourly < 0) {
-            costInput.error = "Enter valid non-negative amounts"
-            return
-        }
-        prefs.edit()
-            .putFloat("cost_per_km", cost)
-            .putFloat("minimum_hourly_net", hourly)
-            .apply()
-        android.widget.Toast.makeText(this, "Profit settings saved", android.widget.Toast.LENGTH_SHORT).show()
-    }
-
     private fun refreshHistory() {
-        val records = TripHistory.read(this)
-        if (records.isEmpty()) {
-            historyText.text = "No offers recorded yet. Detected offers with enough distance and time details will appear here."
-            return
+        val rows = TripHistory.read(this)
+        if (rows.isEmpty()) { historyText.text = "No offers recorded yet. Detected offers with enough details will appear here."; return }
+        val fmt = SimpleDateFormat("dd MMM • HH:mm", Locale.getDefault())
+        historyText.text = rows.take(12).joinToString("\n\n") { r ->
+            fmt.format(Date(r.timestamp)) + "\nFare R%.2f • net R%.2f • %.0f min\n%s".format(Locale.US, r.fare, r.estimatedNet, r.minutes, r.decision)
         }
-        val totalNet = records.sumOf { it.estimatedNet }
-        val totalFare = records.sumOf { it.fare }
-        val formatter = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
-        val lines = records.take(15).map { item ->
-            val date = formatter.format(Date(item.timestamp))
-            val pickup = item.pickupKm?.let { "Pickup %.1f km • ".format(Locale.US, it) } ?: ""
-            "$date\nR%.2f fare • %sTrip %.1f km • %.0f min\nEst. net R%.2f • %s".format(
-                Locale.US, item.fare, pickup, item.tripKm, item.minutes,
-                item.estimatedNet, item.decision
-            )
-        }
-        historyText.text = "Recorded offers: ${records.size} (latest 15 shown)\nTotal recorded fares: R%.2f\nTotal estimated net: R%.2f\n\n%s".format(
-            Locale.US, totalFare, totalNet, lines.joinToString("\n\n")
-        )
     }
 }
